@@ -1,0 +1,12 @@
+-- CreateTable
+CREATE TABLE "ZapRun" (
+    "id" SERIAL NOT NULL,
+    "zapId" INTEGER NOT NULL,
+    "status" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ZapRun_pkey" PRIMARY KEY ("id")
+);
+
+-- AddForeignKey
+ALTER TABLE "ZapRun" ADD CONSTRAINT "ZapRun_zapId_fkey" FOREIGN KEY ("zapId") REFERENCES "Zap"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

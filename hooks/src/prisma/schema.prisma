@@ -21,6 +21,8 @@ model Zap{
     userId    Int
     user      User     @relation(fields: [userId], references: [id])
     triggers  Trigger[]
+    actions   Action[]
+    zapRuns  ZapRun[]
 }
 
 model Trigger{
@@ -35,4 +37,41 @@ model TriggerType{
     id        Int      @id @default(autoincrement())
     name      String
     triggers  Trigger[]
+}
+
+model Action{
+    id        Int      @id @default(autoincrement())
+    type ActionType @relation(fields: [typeId], references: [id])
+    typeId    Int
+    zapId     Int
+    zap       Zap      @relation(fields: [zapId], references: [id])
+}
+model ActionType{
+    id        Int      @id @default(autoincrement())
+    name      String
+    actions   Action[]
+}
+
+model ZapRun{
+    id        Int      @id @default(autoincrement())
+    zapId     Int
+    zap       Zap      @relation(fields: [zapId], references: [id])
+    status    Status?
+    metadata  Json?
+    createdAt DateTime @default(now())
+    zapOutbox ZapOutbox[]
+}
+
+model ZapOutbox{
+    id        Int      @id @default(autoincrement())
+    zapRunId  Int
+    zapRun    ZapRun   @relation(fields: [zapRunId], references: [id])
+    status    Status?
+    createdAt DateTime @default(now())
+}
+
+enum Status{
+    PENDING
+    COMPLETED
+    FAILED
 }
