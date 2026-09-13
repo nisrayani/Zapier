@@ -1,1 +1,21 @@
-{}
+{
+  "name": "zapier-vs-code",
+  "version": "1.0.0",
+  "description": "![Initial](image.png) ![alt text](image-7.png)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nisrayani/Zapier.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/nisrayani/Zapier/issues"
+  },
+  "homepage": "https://github.com/nisrayani/Zapier#readme"
+}

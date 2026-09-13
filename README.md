@@ -1,9 +1,32 @@
-System Architecure of Zapier
+# System Architecure of Zapier
 
 # Initial
 ![Initial](image.png)
+![alt text](image-7.png)
 
 # Component Analysis
+
+## Why dont we do all computation in secondary backend itself? i.e i hooks/catch..
+Decoupling is needed here. Reason: 
+1. Webhooks arrive unpredictably. If a user launches a viral marketing campaign, your server might receive 10,000 webhooks in a second. If you process heavy API calls synchronously, your Node.js server will exhaust its memory and drop incoming requests. A queue acts as a shock absorber, storing the flood of requests safely so workers can process them at a stable pace.
+
+2. aps depend on third-party APIs (Slack, Gmail, OpenAI). These services frequently rate-limit you or experience downtime. If your Express route fails halfway through processing, the webhook data is lost forever. By placing the job in a queue, a background worker can safely retry the failed step later without losing the initial trigger data.
+
+3. A Zap might have 10 steps, require generating an AI summary (which takes 10+ seconds), or even feature a "Delay for 2 hours" node. You cannot hold an HTTP connection open for that long; the client will sever it.
+
+## Why cannot i use the same $transaction and write to to our dba nd kafka directly in that case we donot need outbox and a peocessor to push outbox db to kafka right? 
+Prisma's $transaction only controls your PostgreSQL database. It has absolutely zero power over external systems like Kafka, Redis, or third-party APIs.
+
+When you use $transaction, Prisma is simply sending a BEGIN SQL command to Postgres, running your queries, and then sending a COMMIT or ROLLBACK SQL command at the very end. It does not magically reverse JavaScript execution or undo network requests made to other servers.
+
+## Should you update the status or delete the message in outbox after publishing data to kafka?
+Deleting the message is the standard, recommended practice for a Transactional Outbox.
+
+Here is why deleting is better than updating the status:
+
+Performance: An outbox table's only purpose is to bridge the gap between your database and Kafka. Once the message is safely in Kafka, keeping the row in Postgres is just dead weight. If you only update the status, your ZapOutbox table will eventually grow to millions of rows, slowing down your Sweeper query.
+
+Simplicity: Your Sweeper can use a simple SQL query like DELETE FROM ZapOutbox RETURNING *; to fetch the tasks and clean the queue simultaneously.
 
 ## Initial Write to DB
 

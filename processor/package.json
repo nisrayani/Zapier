@@ -1,0 +1,22 @@
+{
+  "name": "processor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "tsc -b && node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "prisma": "^6.19.3",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "kafkajs": "^2.2.4"
+  }
+}
