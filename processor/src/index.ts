@@ -26,10 +26,9 @@ async function main() {
       topic: KAFKA_TOPIC,
       messages: pendingZaps.map((zap) => ({
         // key: zap.id.toString(),
-        value: zap.zapRunId,
+        value: zap.zapRunId.toString(),
       })),
     });
-    console.log(`Published ${pendingZaps.length} zaps to Kafka topic ${KAFKA_TOPIC}`);
 
     await prisma.zapOutbox.deleteMany({
       where: {
@@ -38,7 +37,6 @@ async function main() {
         },
       }
     });
-    console.log(`Deleting ${pendingZaps.length} zaps from Outbox table`);
   }
 }
 
