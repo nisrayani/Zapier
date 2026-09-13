@@ -45,7 +45,6 @@ model Action{
     typeId    Int
     zapId     Int
     zap       Zap      @relation(fields: [zapId], references: [id])
-    sortingOrder Int @default(0)
 }
 model ActionType{
     id        Int      @id @default(autoincrement())
