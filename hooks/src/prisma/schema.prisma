@@ -8,7 +8,7 @@ datasource db {
 }
 
 model User{
-    id        Int      @id @default(autoincrement())
+    id        String   @id @default(uuid())
     name      String
     email     String   @unique
     password String
@@ -16,46 +16,46 @@ model User{
 }
 
 model Zap{
-    id        Int      @id @default(autoincrement())
+    id        String   @id @default(uuid())
     name      String
-    userId    Int
+    userId    String
     user      User     @relation(fields: [userId], references: [id])
-    triggers  Trigger[]
+    trigger  Trigger? 
     actions   Action[]
     zapRuns  ZapRun[]
 }
 
 model Trigger{
-    id        Int      @id @default(autoincrement())
-    type TriggerType @relation(fields: [typeId], references: [id])
-    typeId    Int
-    zapId     Int
+    id        String   @id @default(uuid())
+    type      TriggerType @relation(fields: [typeId], references: [id])
+    typeId    String
+    zapId     String   @unique
     zap       Zap      @relation(fields: [zapId], references: [id])
 }
 
 model TriggerType{
-    id        Int      @id @default(autoincrement())
+    id        String   @id @default(uuid())
     name      String
     triggers  Trigger[]
 }
 
 model Action{
-    id        Int      @id @default(autoincrement())
+    id        String   @id @default(uuid())
     type ActionType @relation(fields: [typeId], references: [id])
-    typeId    Int
-    zapId     Int
+    typeId    String
+    zapId     String
     zap       Zap      @relation(fields: [zapId], references: [id])
     sortingOrder Int @default(0)
 }
 model ActionType{
-    id        Int      @id @default(autoincrement())
+    id        String   @id @default(uuid())
     name      String
     actions   Action[]
 }
 
 model ZapRun{
-    id        Int      @id @default(autoincrement())
-    zapId     Int
+    id        String   @id @default(uuid())
+    zapId     String
     zap       Zap      @relation(fields: [zapId], references: [id])
     status    Status?
     metadata  Json?
@@ -64,8 +64,8 @@ model ZapRun{
 }
 
 model ZapOutbox{
-    id        Int      @id @default(autoincrement())
-    zapRunId  Int
+    id        String   @id @default(uuid())
+    zapRunId  String
     zapRun    ZapRun   @relation(fields: [zapRunId], references: [id])
     status    Status?
     createdAt DateTime @default(now())
