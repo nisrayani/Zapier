@@ -17,5 +17,8 @@
   "bugs": {
     "url": "https://github.com/nisrayani/Zapier/issues"
   },
-  "homepage": "https://github.com/nisrayani/Zapier#readme"
+  "homepage": "https://github.com/nisrayani/Zapier#readme",
+  "dependencies": {
+    "lucide-react": "^1.46.0"
+  }
 }
