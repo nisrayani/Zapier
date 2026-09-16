@@ -73,8 +73,9 @@ export default function DashboardPage() {
     <div>
       <Appbar />
       <div className="flex justify-center pt-8">
-        <div className="max-w-screen-lg	 w-full">
-          <div className="flex justify-between pr-8 ">
+        {/* Expanded container width to fit long urls comfortably */}
+        <div className="max-w-6xl w-full px-4">
+          <div className="flex justify-between items-center mb-6">
             <div className="text-2xl font-bold">My Zaps</div>
             <DarkButton
               onClick={() => {
@@ -87,13 +88,12 @@ export default function DashboardPage() {
         </div>
       </div>
       {loading ? (
-        "Loading..."
+        <div className="flex justify-center pt-8">Loading...</div>
       ) : error ? (
-        error
+        <div className="flex justify-center pt-8 text-red-500">{error}</div>
       ) : (
         <div className="flex justify-center">
-          {" "}
-          <ZapTable zaps={zaps} />{" "}
+          <ZapTable zaps={zaps} />
         </div>
       )}
     </div>
@@ -102,38 +102,97 @@ export default function DashboardPage() {
 
 function ZapTable({ zaps }: { zaps: Zap[] }) {
   const router = useRouter();
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopy = (url: string, id: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   return (
-    <div className="p-8 max-w-screen-lg w-full">
-      <div className="flex">
-        <div className="flex-1">Name</div>
-        <div className="flex-1">ID</div>
-        <div className="flex-1">Created at</div>
-        <div className="flex-1">Webhook URL</div>
-        <div className="flex-1">Go</div>
+    <div className="px-8 max-w-6xl w-full">
+      {/* 
+        Using a 7-column grid layout:
+        Col 1: Name (1 span)
+        Col 2: ID (1 span)
+        Col 3: Created at (1 span)
+        Cols 4-5: Webhook URL (2 spans so the full URL is visible)
+        Col 6: Action / Go button (1 span)
+      */}
+      <div className="grid grid-cols-6 gap-4 font-semibold text-gray-700 border-b pb-3 items-center">
+        <div>Name</div>
+        <div>ID</div>
+        <div>Created at</div>
+        <div className="col-span-2">Webhook URL</div>
+        <div>Action</div>
       </div>
-      {zaps.map((z) => (
-        <div className="flex border-b border-t py-4">
-          <div className="flex-1 flex">
-            <img src={z.trigger.type.image} className="w-[30px] h-[30px]" />{" "}
-            {z.actions.map((x) => (
-              <img src={x.type.image} className="w-[30px] h-[30px]" />
-            ))}
+
+      {/* Table Rows */}
+      {zaps.map((z) => {
+        const webhookUrl = `${HOOKS_URL}/hooks/catch/1/${z.id}`;
+
+        return (
+          <div
+            key={z.id}
+            className="grid grid-cols-6 gap-4 items-center border-b py-4"
+          >
+            {/* Column 1: Trigger & Action Icons */}
+            <div className="flex items-center space-x-1">
+              {z.trigger?.type?.image && (
+                <img
+                  src={z.trigger.type.image}
+                  className="w-[30px] h-[30px] rounded-full"
+                  alt="Trigger"
+                />
+              )}
+              {z.actions?.map((x, index) => (
+                <img
+                  key={x.id || index}
+                  src={x.type?.image}
+                  className="w-[30px] h-[30px] rounded-full"
+                  alt="Action"
+                />
+              ))}
+            </div>
+
+            {/* Column 2: ID */}
+            <div className="text-sm text-gray-600 truncate" title={z.id}>
+              {z.id}
+            </div>
+
+            {/* Column 3: Created At */}
+            <div className="text-sm text-gray-600">Nov 13, 2023</div>
+
+            {/* Columns 4 & 5: Webhook URL with Input + Copy Button */}
+            <div className="col-span-2 flex items-center space-x-2">
+              <input
+                type="text"
+                readOnly
+                value={webhookUrl}
+                className="text-xs bg-gray-50 border border-gray-300 rounded px-2 py-1.5 w-full text-gray-600 focus:outline-none"
+              />
+              <button
+                onClick={() => handleCopy(webhookUrl, z.id)}
+                className="bg-gray-200 hover:bg-gray-300 text-xs px-3 py-1.5 rounded text-gray-700 font-medium whitespace-nowrap transition-colors"
+              >
+                {copiedId === z.id ? "Copied!" : "Copy"}
+              </button>
+            </div>
+
+            {/* Column 6: Action Button (Go) perfectly aligned */}
+            <div>
+              <LinkButton
+                onClick={() => {
+                  router.push("/zap/" + z.id);
+                }}
+              >
+                Go
+              </LinkButton>
+            </div>
           </div>
-          <div className="flex-1">{z.id}</div>
-          <div className="flex-1">Nov 13, 2023</div>
-          <div className="flex-1">{`${HOOKS_URL}/hooks/catch/1/${z.id}`}</div>
-          <div className="flex-1">
-            <LinkButton
-              onClick={() => {
-                router.push("/zap/" + z.id);
-              }}
-            >
-              Go
-            </LinkButton>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
