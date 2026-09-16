@@ -42,7 +42,7 @@ router.post("/create", authMiddleware, async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 });
-router.post("/", authMiddleware, async (req, res) => {
+router.get("/", authMiddleware, async (req, res) => {
     // @ts-ignore
     const userId = req.userId;
     const zaps = await prisma.zap.findMany({

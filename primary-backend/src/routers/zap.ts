@@ -46,7 +46,7 @@ router.post("/create", authMiddleware, async (req, res) => {
   }
 });
 
-router.post("/", authMiddleware, async (req, res) => {
+router.get("/", authMiddleware, async (req, res) => {
   // @ts-ignore
   const userId = req.userId as string;
   const zaps = await prisma.zap.findMany({
