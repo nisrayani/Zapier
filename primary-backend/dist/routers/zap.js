@@ -14,7 +14,7 @@ router.post("/create", authMiddleware, async (req, res) => {
         await prisma.$transaction(async (tx) => {
             const zap = await tx.zap.create({
                 data: {
-                    name: "New Zap",
+                    name: zapCreateData.data.name ?? "New Zap",
                     // @ts-ignore
                     userId: req.userId,
                     actions: {

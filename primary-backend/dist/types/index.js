@@ -9,6 +9,7 @@ export const SigninSchema = z.object({
     password: z.string().min(6, "Password must be at least 6 characters long"),
 });
 export const ZapCreateSchema = z.object({
+    name: z.string().min(1).optional(),
     triggerTypeId: z.string().min(1, "Trigger ID is required"),
     triggerMetadata: z.any().optional(),
     actions: z.array(z.object({

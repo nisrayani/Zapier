@@ -9,6 +9,7 @@ export declare const SigninSchema: z.ZodObject<{
     password: z.ZodString;
 }, z.core.$strip>;
 export declare const ZapCreateSchema: z.ZodObject<{
+    name: z.ZodOptional<z.ZodString>;
     triggerTypeId: z.ZodString;
     triggerMetadata: z.ZodOptional<z.ZodAny>;
     actions: z.ZodArray<z.ZodObject<{
