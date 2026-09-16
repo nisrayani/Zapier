@@ -1,2 +1,16 @@
-node_modules
-.vscode
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Build outputs
+dist/
+build/
+.tsbuildinfo
+
+# Editor files
+.vscode/
+.idea/
+
+# Dependencies
+node_modules/
