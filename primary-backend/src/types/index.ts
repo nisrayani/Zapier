@@ -12,6 +12,7 @@ export const SigninSchema = z.object({
 });
 
 export const ZapCreateSchema = z.object({
+  name: z.string().min(1).optional(),
   triggerTypeId: z.string().min(1, "Trigger ID is required"),
   triggerMetadata: z.any().optional(),
   actions: z.array(

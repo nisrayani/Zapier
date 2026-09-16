@@ -31,7 +31,15 @@ export default function SignupPage() {
             </div>
             <CheckFeature label={"14-day trial of premium features & apps"} />
           </div>
-          <div className="flex-1 pt-6 pb-6 mt-12 px-4 border rounded">
+          <div className="flex-1 rounded-2xl border border-slate-200 bg-white px-6 pb-7 pt-7 shadow-[0_20px_60px_-35px_rgba(15,23,42,0.45)]">
+            <div className="pb-3">
+              <div className="text-2xl font-bold text-slate-950">
+                Create your account
+              </div>
+              <div className="pt-1 text-sm text-slate-500">
+                Start automating your work in a few minutes.
+              </div>
+            </div>
             <Input
               label={"Name"}
               onChange={(e) => {
@@ -57,7 +65,7 @@ export default function SignupPage() {
               placeholder="Password"
             ></Input>
 
-            <div className="pt-4">
+            <div className="pt-5">
               <PrimaryButton
                 onClick={async () => {
                   const res = await axios.post(

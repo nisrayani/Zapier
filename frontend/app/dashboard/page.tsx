@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 
 interface Zap {
   id: string;
+  name?: string;
   triggerId: string;
   userId: number;
   actions: {
@@ -73,7 +74,6 @@ export default function DashboardPage() {
     <div>
       <Appbar />
       <div className="flex justify-center pt-8">
-        {/* Expanded container width to fit long urls comfortably */}
         <div className="max-w-6xl w-full px-4">
           <div className="flex justify-between items-center mb-6">
             <div className="text-2xl font-bold">My Zaps</div>
@@ -102,27 +102,18 @@ export default function DashboardPage() {
 
 function ZapTable({ zaps }: { zaps: Zap[] }) {
   const router = useRouter();
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedWebhookId, setCopiedWebhookId] = useState<string | null>(null);
 
   const handleCopy = (url: string, id: string) => {
     navigator.clipboard.writeText(url);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    setCopiedWebhookId(id);
+    setTimeout(() => setCopiedWebhookId(null), 2000);
   };
 
   return (
     <div className="px-8 max-w-6xl w-full">
-      {/* 
-        Using a 7-column grid layout:
-        Col 1: Name (1 span)
-        Col 2: ID (1 span)
-        Col 3: Created at (1 span)
-        Cols 4-5: Webhook URL (2 spans so the full URL is visible)
-        Col 6: Action / Go button (1 span)
-      */}
-      <div className="grid grid-cols-6 gap-4 font-semibold text-gray-700 border-b pb-3 items-center">
+      <div className="grid grid-cols-5 gap-4 font-semibold text-gray-700 border-b pb-3 items-center">
         <div>Name</div>
-        <div>ID</div>
         <div>Created at</div>
         <div className="col-span-2">Webhook URL</div>
         <div>Action</div>
@@ -135,36 +126,19 @@ function ZapTable({ zaps }: { zaps: Zap[] }) {
         return (
           <div
             key={z.id}
-            className="grid grid-cols-6 gap-4 items-center border-b py-4"
+            className="grid grid-cols-5 gap-4 items-center border-b py-4"
           >
-            {/* Column 1: Trigger & Action Icons */}
-            <div className="flex items-center space-x-1">
-              {z.trigger?.type?.image && (
-                <img
-                  src={z.trigger.type.image}
-                  className="w-[30px] h-[30px] rounded-full"
-                  alt="Trigger"
-                />
-              )}
-              {z.actions?.map((x, index) => (
-                <img
-                  key={x.id || index}
-                  src={x.type?.image}
-                  className="w-[30px] h-[30px] rounded-full"
-                  alt="Action"
-                />
-              ))}
+            {/* Column 1: Only the Zap Name, images removed */}
+            <div className="flex min-w-0 items-center">
+              <span className="truncate font-medium text-slate-800">
+                {z.name || "New Zap"}
+              </span>
             </div>
 
-            {/* Column 2: ID */}
-            <div className="text-sm text-gray-600 truncate" title={z.id}>
-              {z.id}
-            </div>
-
-            {/* Column 3: Created At */}
+            {/* Column 2: Created At */}
             <div className="text-sm text-gray-600">Nov 13, 2023</div>
 
-            {/* Columns 4 & 5: Webhook URL with Input + Copy Button */}
+            {/* Columns 3 & 4: Webhook URL with Input + Copy Button */}
             <div className="col-span-2 flex items-center space-x-2">
               <input
                 type="text"
@@ -176,11 +150,11 @@ function ZapTable({ zaps }: { zaps: Zap[] }) {
                 onClick={() => handleCopy(webhookUrl, z.id)}
                 className="bg-gray-200 hover:bg-gray-300 text-xs px-3 py-1.5 rounded text-gray-700 font-medium whitespace-nowrap transition-colors"
               >
-                {copiedId === z.id ? "Copied!" : "Copy"}
+                {copiedWebhookId === z.id ? "Copied!" : "Copy"}
               </button>
             </div>
 
-            {/* Column 6: Action Button (Go) perfectly aligned */}
+            {/* Column 5: Action Button (Go) */}
             <div>
               <LinkButton
                 onClick={() => {

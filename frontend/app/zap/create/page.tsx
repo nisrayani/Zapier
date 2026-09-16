@@ -61,6 +61,12 @@ export default function CreateZapPage() {
               return;
             }
 
+            const generatedName = selectedActions.length
+              ? `${selectedTrigger.name} to ${selectedActions
+                  .map((action) => action.availableActionName)
+                  .join(" and ")}`
+              : undefined;
+
             const response = await axios.post(
               `${BACKEND_URL}/api/v1/zap/create`,
               {
@@ -70,6 +76,7 @@ export default function CreateZapPage() {
                   actionTypeId: a.availableActionId,
                   actionMetadata: a.metadata,
                 })),
+                name: generatedName,
               },
               {
                 headers: {
@@ -266,7 +273,12 @@ function Modal({
                       }}
                       className="flex border p-4 cursor-pointer hover:bg-slate-100"
                     >
-                      <img src={image} width={30} className="rounded-full" />{" "}
+                      <img
+                        src={image}
+                        width={30}
+                        className="rounded-full"
+                        alt={name}
+                      />{" "}
                       <div className="flex flex-col justify-center">
                         {" "}
                         {name}{" "}
