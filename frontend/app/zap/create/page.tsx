@@ -96,7 +96,7 @@ export default function CreateZapPage() {
         </div>
         <div className="w-full pt-2 pb-2">
           {selectedActions.map((action, index) => (
-            <div className="pt-2 flex justify-center">
+            <div key={action.index} className="pt-2 flex justify-center">
               {" "}
               <ZapCell
                 onClick={() => {
@@ -221,7 +221,7 @@ function Modal({
             </button>
           </div>
           <div className="p-4 md:p-5 space-y-4">
-            {step === 1 && selectedAction?.id === "email" && (
+            {step === 1 && selectedAction?.name === "email" && (
               <EmailSelector
                 setMetadata={(metadata) => {
                   onSelect({
@@ -232,7 +232,7 @@ function Modal({
               />
             )}
 
-            {step === 1 && selectedAction?.id === "send-sol" && (
+            {step === 1 && selectedAction?.name === "send-sol" && (
               <SolanaSelector
                 setMetadata={(metadata) => {
                   onSelect({
@@ -248,6 +248,7 @@ function Modal({
                 {availableItems.map(({ id, name, image }) => {
                   return (
                     <div
+                      key={id}
                       onClick={() => {
                         if (isTrigger) {
                           onSelect({
