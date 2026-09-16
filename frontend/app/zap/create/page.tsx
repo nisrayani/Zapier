@@ -50,46 +50,59 @@ export default function CreateZapPage() {
   const [selectedModalIndex, setSelectedModalIndex] = useState<null | number>(
     null,
   );
+  const publishDisabled =
+    !selectedTrigger?.id ||
+    selectedActions.length === 0 ||
+    selectedActions.some((action) => !action.availableActionId);
 
   return (
     <div>
       <Appbar />
       <div className="flex justify-end bg-slate-200 p-4">
-        <PrimaryButton
-          onClick={async () => {
-            if (!selectedTrigger?.id) {
-              return;
-            }
-
-            const generatedName = selectedActions.length
-              ? `${selectedTrigger.name} to ${selectedActions
-                  .map((action) => action.availableActionName)
-                  .join(" and ")}`
-              : undefined;
-
-            const response = await axios.post(
-              `${BACKEND_URL}/api/v1/zap/create`,
-              {
-                triggerTypeId: selectedTrigger.id,
-                triggerMetadata: {},
-                actions: selectedActions.map((a) => ({
-                  actionTypeId: a.availableActionId,
-                  actionMetadata: a.metadata,
-                })),
-                name: generatedName,
-              },
-              {
-                headers: {
-                  Authorization: `Bearer ${localStorage.getItem("token")}`,
-                },
-              },
-            );
-
-            router.push("/dashboard");
-          }}
+        <span
+          title={
+            publishDisabled
+              ? "Add at least 1 trigger and 1 action to enable Publish"
+              : ""
+          }
         >
-          Publish
-        </PrimaryButton>
+          <PrimaryButton
+            disabled={publishDisabled}
+            onClick={async () => {
+              if (!selectedTrigger?.id) {
+                return;
+              }
+
+              const generatedName = selectedActions.length
+                ? `${selectedTrigger.name} to ${selectedActions
+                    .map((action) => action.availableActionName)
+                    .join(" and ")}`
+                : undefined;
+
+              const response = await axios.post(
+                `${BACKEND_URL}/api/v1/zap/create`,
+                {
+                  triggerTypeId: selectedTrigger.id,
+                  triggerMetadata: {},
+                  actions: selectedActions.map((a) => ({
+                    actionTypeId: a.availableActionId,
+                    actionMetadata: a.metadata,
+                  })),
+                  name: generatedName,
+                },
+                {
+                  headers: {
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                  },
+                },
+              );
+
+              router.push("/dashboard");
+            }}
+          >
+            Publish
+          </PrimaryButton>
+        </span>
       </div>
       <div className="w-full min-h-screen bg-slate-200 flex flex-col justify-center">
         <div className="flex justify-center w-full">
@@ -252,7 +265,7 @@ function Modal({
 
             {step === 0 && (
               <div>
-                {availableItems.map(({ id, name, image }) => {
+                {availableItems.map(({ id, name }) => {
                   return (
                     <div
                       key={id}
@@ -273,16 +286,7 @@ function Modal({
                       }}
                       className="flex border p-4 cursor-pointer hover:bg-slate-100"
                     >
-                      <img
-                        src={image}
-                        width={30}
-                        className="rounded-full"
-                        alt={name}
-                      />{" "}
-                      <div className="flex flex-col justify-center">
-                        {" "}
-                        {name}{" "}
-                      </div>
+                      <div className="flex flex-col justify-center">{name}</div>
                     </div>
                   );
                 })}
@@ -302,24 +306,43 @@ function EmailSelector({
 }) {
   const [email, setEmail] = useState("");
   const [body, setBody] = useState("");
+  const [error, setError] = useState("");
+
+  // Standard Regex to check for valid email structure (e.g., test@example.com)
+  const validateEmail = (emailStr: string) => {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(emailStr);
+  };
 
   return (
     <div>
       <Input
         label={"To"}
         type={"text"}
-        placeholder="To"
-        onChange={(e) => setEmail(e.target.value)}
+        placeholder="To (e.g. user@gmail.com)"
+        onChange={(e) => {
+          setEmail(e.target.value);
+          if (error) setError("");
+        }}
       ></Input>
+
+      {/* Show error message in red if email is invalid */}
+      {error && <div className="text-red-500 text-xs mt-1">{error}</div>}
+
       <Input
         label={"Body"}
         type={"text"}
         placeholder="Body"
         onChange={(e) => setBody(e.target.value)}
       ></Input>
+
       <div className="pt-2">
         <PrimaryButton
           onClick={() => {
+            if (!validateEmail(email)) {
+              setError("Please enter a valid email address.");
+              return; // Stop execution if email is invalid
+            }
             setMetadata({
               email,
               body,
