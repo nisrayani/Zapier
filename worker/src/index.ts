@@ -9,29 +9,118 @@ const kafka = new Kafka({
 const KAFKA_TOPIC = "zap-events";
 
 async function main() {
-  const consumer = kafka.consumer({ groupId: "main-worker" });
+  const consumer = kafka.consumer({ groupId: "main-worker-2" });
   await consumer.connect();
   await consumer.subscribe({ topic: KAFKA_TOPIC, fromBeginning: true });
-  console.log(`Connected to Kafka broker and ready to consume from topic ${KAFKA_TOPIC}`);
+  console.log(
+    `Connected to Kafka broker from worker and ready to consume from topic ${KAFKA_TOPIC}`,
+  );
 
-    await consumer.run({
-        autoCommit: false,
-        eachMessage: async ({ topic, partition, message }) => {
-        console.log(`Received event from topic ${topic}:`, message.value?.toString());
+  const producer = kafka.producer();
+  await producer.connect();
+  console.log(
+    `Connected to Kafka broker from worker and ready to publish to topic ${KAFKA_TOPIC}`,
+  );
 
-        // process it
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-        console.log(`Processed event from topic ${topic}:`, message.value?.toString());
+  await consumer.run({
+    autoCommit: false,
+    eachMessage: async ({ topic, partition, message }) => {
+      console.log(
+        `Received event from topic ${topic}:`,
+        message.value?.toString(),
+      );
 
-        // manual ack to kafka that the message has been processed
-        // this ensures that message is not lost from kafka in case the server crashes before the message is processed
-        consumer.commitOffsets([{ 
-            topic: KAFKA_TOPIC, 
-            partition: partition, 
-            offset: (parseInt(message.offset) + 1).toString() 
-        }]);
+      if (!message.value?.toString()) {
+        return;
+      }
+
+      try {
+        JSON.parse(message.value?.toString());
+      } catch (err) {
+        console.log("Error parsing the value");
+        return;
+      }
+
+      const parsedValue = JSON.parse(message.value?.toString());
+      const zapRunId = parsedValue.zapRunId;
+      const stage = parsedValue.stage;
+
+      const zapRunDetails = await prisma.zapRun.findFirst({
+        where: {
+          id: zapRunId,
         },
+        include: {
+          zap: {
+            include: {
+              trigger: true,
+              actions: {
+                include: {
+                  type: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const actions = zapRunDetails?.zap.actions;
+      const currentAction = actions?.find(
+        (action) => action.sortingOrder == stage,
+      );
+
+      if (!currentAction) {
+        console.log(`No action exist at stage : ${stage}`);
+        return;
+      }
+
+      switch (currentAction.type.name) {
+        case "email":
+          console.log("Sedning out an email");
+          break;
+        case "solana_send":
+          console.log("Sedning out an solana");
+          break;
+        default:
+      }
+
+      const lastStage = (actions?.length || 1) - 1;
+      if (stage !== lastStage) {
+        // produce the event with next stage processing
+        await producer.send({
+          topic: KAFKA_TOPIC,
+          messages: [
+            {
+              value: JSON.stringify({
+                zapRunId,
+                stage: currentAction.sortingOrder + 1,
+              }),
+            },
+          ],
+        });
+        console.log(
+          `Pushed above event ${parsedValue} with stage: ${currentAction.sortingOrder + 1} to Kafka`,
+        );
+      } else {
+        console.log(`Processed last stage of ${parsedValue}`);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      console.log(
+        `Processed event from topic ${topic}:`,
+        message.value?.toString(),
+      );
+
+      // manual ack to kafka that the message has been processed
+      // this ensures that message is not lost from kafka in case the server crashes before the message is processed
+      await consumer.commitOffsets([
+        {
+          topic: KAFKA_TOPIC,
+          partition: partition,
+          offset: (Number(message.offset) + 1).toString(),
+        },
+      ]);
+    },
   });
 }
 
-main()
+main();

@@ -22,18 +22,17 @@ async function main() {
             topic: KAFKA_TOPIC,
             messages: pendingZaps.map((zap) => ({
                 // key: zap.id.toString(),
-                value: zap.zapRunId.toString(),
+                // stage : which stage you are running on, whether you are running 1st stage/(trigger), 2nd stage(1st action etc)
+                value: JSON.stringify({ zapRunId: zap.zapRunId.toString(), stage: 0 }),
             })),
         });
-        console.log(`Published ${pendingZaps.length} zaps to Kafka topic ${KAFKA_TOPIC}`);
         await prisma.zapOutbox.deleteMany({
             where: {
-                id: {
+                zapRunId: {
                     in: pendingZaps.map((zap) => zap.zapRunId),
                 },
-            }
+            },
         });
-        console.log(`Deleting ${pendingZaps.length} zaps from Outbox table`);
     }
 }
 main();
