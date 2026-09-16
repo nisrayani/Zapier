@@ -1,5 +1,9 @@
 import { PrismaClient } from "@prisma/client";
+import type { JsonObject } from "@prisma/client/runtime/library";
 import { Kafka } from "kafkajs";
+import { parse } from "./parser.js";
+import { sendEmail } from "./email.js";
+import { sendSol } from "./solana.js";
 
 const prisma = new PrismaClient();
 const kafka = new Kafka({
@@ -75,10 +79,30 @@ async function main() {
 
       switch (currentAction.type.name) {
         case "email":
-          console.log("Sedning out an email");
+          console.log("Processing Email action");
+          const zapRunDetailsMetaData = zapRunDetails?.metadata; // {comment: {email: nisrayani.13@gami.com}, {amount:10}}
+          const body = parse(
+            (currentAction.metadata as JsonObject).body as string,
+            zapRunDetailsMetaData as Record<string, any>,
+          ); // You just received {comment.amount}
+          const to = parse(
+            (currentAction.metadata as JsonObject).email as string,
+            zapRunDetailsMetaData as Record<string, any>,
+          ); // {comment.email}
+
+          sendEmail(to, body);
           break;
         case "solana_send":
-          console.log("Sedning out an solana");
+          console.log("Processing Solana send");
+          const amount = parse(
+            (currentAction.metadata as JsonObject).amount as string,
+            zapRunDetailsMetaData as Record<string, any>,
+          );
+          const address = parse(
+            (currentAction.metadata as JsonObject).address as string,
+            zapRunDetailsMetaData as Record<string, any>,
+          );
+          sendSol(amount, address);
           break;
         default:
       }

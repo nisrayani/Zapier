@@ -12,12 +12,14 @@
   "license": "ISC",
   "type": "module",
   "devDependencies": {
+    "@types/nodemailer": "^8.0.2",
     "prisma": "^6.19.3",
     "typescript": "^7.0.2"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "ka": "^0.0.1",
-    "kafkajs": "^2.2.4"
+    "kafkajs": "^2.2.4",
+    "nodemailer": "^10.0.10"
   }
 }
