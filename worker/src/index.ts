@@ -107,8 +107,13 @@ async function main() {
               (currentAction.metadata as JsonObject).email as string,
               zapRunDetailsMetaData as Record<string, any>,
             );
+            const subject = parse(
+              ((currentAction.metadata as JsonObject).subject as string) ??
+                "Hello from Zapier",
+              zapRunDetailsMetaData as Record<string, any>,
+            );
 
-            await sendEmail(to, body);
+            await sendEmail(to, subject, body);
             break;
           case "solana_send":
             console.log("Processing Solana send");

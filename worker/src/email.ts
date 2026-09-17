@@ -10,13 +10,15 @@ const transport = nodemailer.createTransport({
   },
 });
 
-export async function sendEmail(to: string, body: string) {
-  console.log(`Inside sendEmail to: ${to} and body: ${body}`);
+export async function sendEmail(to: string, subject: string, body: string) {
+  console.log(`Inside sendEmail to: ${to} subject: ${subject} body: ${body}`);
   await transport.sendMail({
     sender: "nisrayaniraj.13@gmail.com",
     to,
-    subject: "Hello from Zapier",
+    subject,
     text: body,
   });
-  console.log(`Sent an email to ${to} from nisrayaniraj.13@gmail.com`);
+  console.log(
+    `Sent an email to ${to} with subject "${subject}" from nisrayaniraj.13@gmail.com`,
+  );
 }

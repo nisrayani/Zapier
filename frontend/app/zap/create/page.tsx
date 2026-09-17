@@ -305,6 +305,7 @@ function EmailSelector({
   setMetadata: (params: any) => void;
 }) {
   const [email, setEmail] = useState("");
+  const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
 
@@ -326,6 +327,13 @@ function EmailSelector({
         }}
       ></Input>
 
+      <Input
+        label={"Subject"}
+        type={"text"}
+        placeholder="Subject"
+        onChange={(e) => setSubject(e.target.value)}
+      ></Input>
+
       {/* Show error message in red if email is invalid */}
       {error && <div className="text-red-500 text-xs mt-1">{error}</div>}
 
@@ -345,6 +353,7 @@ function EmailSelector({
             }
             setMetadata({
               email,
+              subject,
               body,
             });
           }}
