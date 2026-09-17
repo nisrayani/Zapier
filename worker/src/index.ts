@@ -74,75 +74,117 @@ async function main() {
 
       if (!currentAction) {
         console.log(`No action exist at stage : ${stage}`);
+        await consumer.commitOffsets([
+          {
+            topic: KAFKA_TOPIC,
+            partition: partition,
+            offset: (Number(message.offset) + 1).toString(),
+          },
+        ]);
         return;
       }
 
-      switch (currentAction.type.name) {
-        case "email":
-          console.log("Processing Email action");
-          const zapRunDetailsMetaData = zapRunDetails?.metadata; // {comment: {email: nisrayani.13@gami.com}, {amount:10}}
-          const body = parse(
-            (currentAction.metadata as JsonObject).body as string,
-            zapRunDetailsMetaData as Record<string, any>,
-          ); // You just received {comment.amount}
-          const to = parse(
-            (currentAction.metadata as JsonObject).email as string,
-            zapRunDetailsMetaData as Record<string, any>,
-          ); // {comment.email}
-
-          sendEmail(to, body);
-          break;
-        case "solana_send":
-          console.log("Processing Solana send");
-          const amount = parse(
-            (currentAction.metadata as JsonObject).amount as string,
-            zapRunDetailsMetaData as Record<string, any>,
-          );
-          const address = parse(
-            (currentAction.metadata as JsonObject).address as string,
-            zapRunDetailsMetaData as Record<string, any>,
-          );
-          sendSol(amount, address);
-          break;
-        default:
-      }
-
-      const lastStage = (actions?.length || 1) - 1;
-      if (stage !== lastStage) {
-        // produce the event with next stage processing
-        await producer.send({
-          topic: KAFKA_TOPIC,
-          messages: [
-            {
-              value: JSON.stringify({
-                zapRunId,
-                stage: currentAction.sortingOrder + 1,
-              }),
-            },
-          ],
+      if (stage === 0) {
+        await prisma.zapRun.update({
+          where: { id: zapRunId },
+          data: {
+            status: "RUNNING",
+          },
         });
-        console.log(
-          `Pushed above event ${parsedValue} with stage: ${currentAction.sortingOrder + 1} to Kafka`,
-        );
-      } else {
-        console.log(`Processed last stage of ${parsedValue}`);
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-      console.log(
-        `Processed event from topic ${topic}:`,
-        message.value?.toString(),
-      );
+      try {
+        const zapRunDetailsMetaData = zapRunDetails?.metadata;
 
-      // manual ack to kafka that the message has been processed
-      // this ensures that message is not lost from kafka in case the server crashes before the message is processed
-      await consumer.commitOffsets([
-        {
-          topic: KAFKA_TOPIC,
-          partition: partition,
-          offset: (Number(message.offset) + 1).toString(),
-        },
-      ]);
+        switch (currentAction.type.name) {
+          case "email":
+            console.log("Processing Email action");
+            const body = parse(
+              (currentAction.metadata as JsonObject).body as string,
+              zapRunDetailsMetaData as Record<string, any>,
+            );
+            const to = parse(
+              (currentAction.metadata as JsonObject).email as string,
+              zapRunDetailsMetaData as Record<string, any>,
+            );
+
+            await sendEmail(to, body);
+            break;
+          case "solana_send":
+            console.log("Processing Solana send");
+            const amount = parse(
+              (currentAction.metadata as JsonObject).amount as string,
+              zapRunDetailsMetaData as Record<string, any>,
+            );
+            const address = parse(
+              (currentAction.metadata as JsonObject).address as string,
+              zapRunDetailsMetaData as Record<string, any>,
+            );
+            await sendSol(amount, address);
+            break;
+          default:
+        }
+
+        const lastStage = (actions?.length || 1) - 1;
+        if (stage !== lastStage) {
+          const nextStage = currentAction.sortingOrder + 1;
+
+          await prisma.zapRun.update({
+            where: { id: zapRunId },
+            data: {
+              status: "RUNNING",
+            },
+          });
+
+          await producer.send({
+            topic: KAFKA_TOPIC,
+            messages: [
+              {
+                value: JSON.stringify({
+                  zapRunId,
+                  stage: nextStage,
+                }),
+              },
+            ],
+          });
+
+          console.log(
+            `Pushed above event ${parsedValue} with stage: ${nextStage} to Kafka`,
+          );
+        } else {
+          await prisma.zapRun.update({
+            where: { id: zapRunId },
+            data: {
+              status: "COMPLETED",
+            },
+          });
+          console.log(`Processed last stage of ${parsedValue}`);
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        console.log(
+          `Processed event from topic ${topic}:`,
+          message.value?.toString(),
+        );
+
+        await consumer.commitOffsets([
+          {
+            topic: KAFKA_TOPIC,
+            partition: partition,
+            offset: (Number(message.offset) + 1).toString(),
+          },
+        ]);
+      } catch (error) {
+        console.error(`Error at stage ${stage} for run ${zapRunId}:`, error);
+        await prisma.zapRun
+          .update({
+            where: { id: zapRunId },
+            data: {
+              status: "FAILED",
+            },
+          })
+          .catch(() => undefined);
+      }
     },
   });
 }

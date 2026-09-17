@@ -59,9 +59,10 @@ model ZapRun{
     id        String   @id @default(uuid())
     zapId     String
     zap       Zap      @relation(fields: [zapId], references: [id])
-    status    Status?
+    status    Status   @default(PENDING)
     metadata  Json?
     createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
     zapOutbox ZapOutbox[]
 }
 
@@ -75,6 +76,7 @@ model ZapOutbox{
 
 enum Status{
     PENDING
+    RUNNING
     COMPLETED
     FAILED
     PUBLISHED

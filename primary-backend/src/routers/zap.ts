@@ -103,6 +103,9 @@ router.get("/zapRuns/:zapId", authMiddleware, async (req, res) => {
     where: {
       zapId: zapId as string,
     },
+    orderBy: {
+      createdAt: "desc",
+    },
   });
   res.json({
     zapRuns,
