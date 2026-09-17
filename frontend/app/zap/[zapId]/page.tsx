@@ -4,7 +4,7 @@ import { Appbar } from "@/components/Appbar";
 import axios from "axios";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { BACKEND_URL } from "@/app/config";
+import { BACKEND_URL, HOOKS_URL } from "@/app/config";
 
 interface ZapRun {
   id: string;
@@ -53,6 +53,7 @@ export default function ZapDetailPage() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -124,6 +125,17 @@ export default function ZapDetailPage() {
   const actionNames = (zap.actions ?? []).map(
     (action) => action.type?.name ?? "Action",
   );
+  const webhookUrl = `${HOOKS_URL}/hooks/catch/1/${zap.id}`;
+
+  const handleCopyWebhookUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(webhookUrl);
+      setCopiedWebhookUrl(true);
+      setTimeout(() => setCopiedWebhookUrl(false), 2000);
+    } catch {
+      // no-op: clipboard is optional and not required for function
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -246,6 +258,21 @@ export default function ZapDetailPage() {
                   <span className="font-medium text-slate-900">
                     {new Date(selectedRun.createdAt).toLocaleString()}
                   </span>
+                </div>
+                <div className="rounded-lg bg-white p-3">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="text-slate-500">Webhook URL</div>
+                    <button
+                      type="button"
+                      onClick={handleCopyWebhookUrl}
+                      className="rounded border border-slate-300 bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700 transition hover:bg-slate-200"
+                    >
+                      {copiedWebhookUrl ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                  <div className="break-all font-medium text-slate-900">
+                    {webhookUrl}
+                  </div>
                 </div>
                 <div className="flex items-center justify-between rounded-lg bg-white p-3">
                   <span className="text-slate-500">Status</span>
