@@ -334,6 +334,11 @@ function Modal({
 }
 
 const BASE_TEMPLATE_TOKENS = [
+  { label: "Trigger → Name", value: "{trigger.name}" },
+  { label: "Trigger → Email", value: "{trigger.email}" },
+  { label: "Trigger → Comment", value: "{trigger.comment}" },
+  { label: "Trigger → Subject", value: "{trigger.subject}" },
+  { label: "Trigger → Message", value: "{trigger.message}" },
   { label: "Trigger → Repository name", value: "{trigger.repository.name}" },
   {
     label: "Trigger → Repository full name",
@@ -399,10 +404,16 @@ function EmailSelector({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
+  const [showToTokens, setShowToTokens] = useState(false);
   const [showSubjectTokens, setShowSubjectTokens] = useState(false);
   const [showBodyTokens, setShowBodyTokens] = useState(false);
 
-  const insertToken = (token: string, target: "subject" | "body") => {
+  const insertToken = (token: string, target: "to" | "subject" | "body") => {
+    if (target === "to") {
+      setEmail((prev) => `${prev}${prev ? " " : ""}${token}`);
+      setShowToTokens(false);
+      return;
+    }
     if (target === "subject") {
       setSubject((prev) => `${prev}${prev ? " " : ""}${token}`);
       setShowSubjectTokens(false);
@@ -414,7 +425,7 @@ function EmailSelector({
 
   const validateEmail = (emailStr: string) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return regex.test(emailStr);
+    return regex.test(emailStr) || /\{[^}]+\}/.test(emailStr);
   };
 
   return (
@@ -422,12 +433,32 @@ function EmailSelector({
       <Input
         label={"To"}
         type={"text"}
-        placeholder="To (e.g. user@gmail.com)"
+        placeholder="To (e.g. user@gmail.com or {trigger.email})"
+        value={email}
         onChange={(e) => {
           setEmail(e.target.value);
           if (error) setError("");
         }}
       ></Input>
+      <div className="mt-2 flex justify-end">
+        <button
+          type="button"
+          className="border border-slate-300 rounded px-2 py-2 text-xs text-slate-700 bg-white"
+          onClick={() => {
+            setShowSubjectTokens(false);
+            setShowBodyTokens(false);
+            setShowToTokens((prev) => !prev);
+          }}
+        >
+          Add variable
+        </button>
+      </div>
+      {showToTokens && (
+        <TemplateTokenMenu
+          currentActionPosition={currentActionPosition}
+          onInsert={(token) => insertToken(token, "to")}
+        />
+      )}
 
       <div className="pt-2">
         <div className="text-sm pb-1 pt-2">

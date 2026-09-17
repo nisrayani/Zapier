@@ -6,9 +6,18 @@ import { parse } from "./parser.js";
 import { sendEmail } from "./email.js";
 import { sendSol } from "./solana.js";
 
-function normalizeGitHubContext(rawMetadata: Record<string, any>) {
-  const source = rawMetadata ?? {};
+function isGitHubLikePayload(rawMetadata: Record<string, any>) {
+  return Boolean(
+    rawMetadata?.repository ||
+    rawMetadata?.pull_request ||
+    rawMetadata?.sender ||
+    rawMetadata?.head_commit ||
+    rawMetadata?.ref,
+  );
+}
 
+function normalizeTriggerContext(rawMetadata: Record<string, any>) {
+  const source = rawMetadata ?? {};
   const repository = source.repository ??
     source.repo ?? {
       name: source.name ?? "",
@@ -25,21 +34,36 @@ function normalizeGitHubContext(rawMetadata: Record<string, any>) {
     };
 
   const sender = source.sender ?? source.user ?? {};
-  const action = source.action ?? "unknown";
+  const action =
+    source.action ?? (isGitHubLikePayload(source) ? "unknown" : "webhook");
+  const commentText =
+    source.comment ??
+    source.comments ??
+    source.message ??
+    source.description ??
+    "";
 
   return {
     raw: source,
     action,
+    name: source.name ?? "",
+    email: source.email ?? "",
+    comment: commentText,
+    subject: source.subject ?? "",
+    message: source.message ?? source.comment ?? source.comments ?? "",
     repository,
     pull_request: pullRequest,
-    sender,
+    sender: {
+      login: sender.login ?? source.email ?? "",
+      name: sender.name ?? source.name ?? "",
+    },
     repository_name: repository.name ?? "",
     repository_full_name: repository.full_name ?? "",
     pull_request_number: pullRequest.number ?? "",
     pull_request_title: pullRequest.title ?? "",
     pull_request_url: pullRequest.html_url ?? "",
-    sender_login: sender.login ?? "",
-    sender_name: sender.name ?? sender.login ?? "",
+    sender_login: sender.login ?? source.email ?? "",
+    sender_name: sender.name ?? source.name ?? "",
     ref: source.ref ?? "",
     pusher: source.pusher ?? {},
     head_commit: source.head_commit ?? {},
@@ -49,7 +73,7 @@ function normalizeGitHubContext(rawMetadata: Record<string, any>) {
 function buildWorkflowContext(rawMetadata: Record<string, any>) {
   const stepResults = Array.isArray(rawMetadata.steps) ? rawMetadata.steps : [];
 
-  const normalizedTriggerContext = normalizeGitHubContext(rawMetadata);
+  const normalizedTriggerContext = normalizeTriggerContext(rawMetadata);
   const lastStepOutput =
     stepResults.length > 0
       ? (stepResults[stepResults.length - 1]?.output ?? "")

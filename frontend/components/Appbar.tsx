@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { LinkButton } from "./buttons/LinkButton";
 import { PrimaryButton } from "./buttons/PrimaryButton";
 
+const GOOGLE_FORM_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSe98T0Kes6vczyjNxtQcZLSUb6aPL7WrAcdFvXe__KPHt7vIQ/viewform?usp=publish-editor";
+
 export const Appbar = () => {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -83,6 +86,14 @@ export const Appbar = () => {
         </div>
       </div>
       <div className="flex items-center gap-1">
+        <LinkButton
+          onClick={() => {
+            window.open(GOOGLE_FORM_URL, "_blank", "noopener,noreferrer");
+          }}
+        >
+          Contact Support
+        </LinkButton>
+
         {isLoggedIn ? (
           <LinkButton
             onClick={() => {
