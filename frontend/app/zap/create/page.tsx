@@ -184,6 +184,7 @@ export default function CreateZapPage() {
             setSelectedModalIndex(null);
           }}
           index={selectedModalIndex}
+          selectedActions={selectedActions}
         />
       )}
     </div>
@@ -194,10 +195,17 @@ function Modal({
   index,
   onSelect,
   availableItems,
+  selectedActions,
 }: {
   index: number;
   onSelect: (props: null | { name: string; id: string; metadata: any }) => void;
   availableItems: { id: string; name: string; image: string }[];
+  selectedActions: {
+    index: number;
+    availableActionId: string;
+    availableActionName: string;
+    metadata: any;
+  }[];
 }) {
   const [step, setStep] = useState(0);
   const [selectedAction, setSelectedAction] = useState<{
@@ -205,6 +213,7 @@ function Modal({
     name: string;
   }>();
   const isTrigger = index === 1;
+  const currentActionPosition = Math.max(index - 2, 0);
 
   return (
     <div className="fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full bg-slate-100 bg-opacity-70 flex">
@@ -243,6 +252,7 @@ function Modal({
           <div className="p-4 md:p-5 space-y-4">
             {step === 1 && selectedAction?.name === "email" && (
               <EmailSelector
+                currentActionPosition={currentActionPosition}
                 setMetadata={(metadata) => {
                   onSelect({
                     ...selectedAction,
@@ -254,6 +264,7 @@ function Modal({
 
             {step === 1 && selectedAction?.name === "ai_summary" && (
               <AISelector
+                currentActionPosition={currentActionPosition}
                 setMetadata={(metadata) => {
                   onSelect({
                     ...selectedAction,
@@ -265,6 +276,7 @@ function Modal({
 
             {step === 1 && selectedAction?.name === "openai" && (
               <AISelector
+                currentActionPosition={currentActionPosition}
                 setMetadata={(metadata) => {
                   onSelect({
                     ...selectedAction,
@@ -321,17 +333,85 @@ function Modal({
   );
 }
 
+const BASE_TEMPLATE_TOKENS = [
+  { label: "Trigger → Repository name", value: "{trigger.repository.name}" },
+  {
+    label: "Trigger → Repository full name",
+    value: "{trigger.repository.full_name}",
+  },
+  { label: "Trigger → PR title", value: "{trigger.pull_request.title}" },
+  { label: "Trigger → PR number", value: "{trigger.pull_request.number}" },
+  { label: "Trigger → Sender login", value: "{trigger.sender.login}" },
+  { label: "Trigger → Action", value: "{trigger.action}" },
+];
+
+function buildTemplateTokens(currentActionPosition: number) {
+  const previousStepTokens = Array.from(
+    { length: currentActionPosition },
+    (_, index) => ({
+      label: `Step ${index} output`,
+      value: `{steps.${index}.output}`,
+    }),
+  );
+
+  return [...BASE_TEMPLATE_TOKENS, ...previousStepTokens];
+}
+
+function TemplateTokenMenu({
+  onInsert,
+  currentActionPosition,
+}: {
+  onInsert: (token: string) => void;
+  currentActionPosition: number;
+}) {
+  const tokens = buildTemplateTokens(currentActionPosition);
+
+  return (
+    <div className="mt-2 border border-slate-300 rounded-md bg-white p-2 shadow-sm max-h-40 overflow-y-auto">
+      <div className="text-xs font-medium text-slate-500 mb-2">
+        Available variables
+      </div>
+      <div className="space-y-1">
+        {tokens.map((token) => (
+          <button
+            key={token.value}
+            type="button"
+            className="block w-full text-left px-2 py-1 rounded hover:bg-slate-100 text-sm text-slate-700"
+            onClick={() => onInsert(token.value)}
+          >
+            {token.label}:{" "}
+            <span className="font-mono text-xs">{token.value}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function EmailSelector({
   setMetadata,
+  currentActionPosition,
 }: {
   setMetadata: (params: any) => void;
+  currentActionPosition: number;
 }) {
   const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
+  const [showSubjectTokens, setShowSubjectTokens] = useState(false);
+  const [showBodyTokens, setShowBodyTokens] = useState(false);
 
-  // Standard Regex to check for valid email structure (e.g., test@example.com)
+  const insertToken = (token: string, target: "subject" | "body") => {
+    if (target === "subject") {
+      setSubject((prev) => `${prev}${prev ? " " : ""}${token}`);
+      setShowSubjectTokens(false);
+      return;
+    }
+    setBody((prev) => `${prev}${prev ? " " : ""}${token}`);
+    setShowBodyTokens(false);
+  };
+
   const validateEmail = (emailStr: string) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return regex.test(emailStr);
@@ -349,29 +429,74 @@ function EmailSelector({
         }}
       ></Input>
 
-      <Input
-        label={"Subject"}
-        type={"text"}
-        placeholder="Subject"
-        onChange={(e) => setSubject(e.target.value)}
-      ></Input>
+      <div className="pt-2">
+        <div className="text-sm pb-1 pt-2">
+          * <label>Subject</label>
+        </div>
+        <input
+          className="border rounded px-4 py-2 w-full border-black"
+          value={subject}
+          placeholder="Subject"
+          onChange={(e) => setSubject(e.target.value)}
+        />
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            className="border border-slate-300 rounded px-2 py-2 text-xs text-slate-700 bg-white"
+            onClick={() => {
+              setShowBodyTokens(false);
+              setShowSubjectTokens((prev) => !prev);
+            }}
+          >
+            Add variable
+          </button>
+        </div>
+        {showSubjectTokens && (
+          <TemplateTokenMenu
+            currentActionPosition={currentActionPosition}
+            onInsert={(token) => insertToken(token, "subject")}
+          />
+        )}
+      </div>
 
-      {/* Show error message in red if email is invalid */}
       {error && <div className="text-red-500 text-xs mt-1">{error}</div>}
 
-      <Input
-        label={"Body"}
-        type={"text"}
-        placeholder="Body"
-        onChange={(e) => setBody(e.target.value)}
-      ></Input>
+      <div className="pt-2">
+        <div className="text-sm pb-1 pt-2">
+          * <label>Body</label>
+        </div>
+        <textarea
+          className="border rounded px-4 py-2 w-full border-black min-h-[90px]"
+          value={body}
+          placeholder="Body"
+          onChange={(e) => setBody(e.target.value)}
+        />
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            className="border border-slate-300 rounded px-2 py-2 text-xs text-slate-700 bg-white"
+            onClick={() => {
+              setShowSubjectTokens(false);
+              setShowBodyTokens((prev) => !prev);
+            }}
+          >
+            Insert variable
+          </button>
+        </div>
+        {showBodyTokens && (
+          <TemplateTokenMenu
+            currentActionPosition={currentActionPosition}
+            onInsert={(token) => insertToken(token, "body")}
+          />
+        )}
+      </div>
 
       <div className="pt-2">
         <PrimaryButton
           onClick={() => {
             if (!validateEmail(email)) {
               setError("Please enter a valid email address.");
-              return; // Stop execution if email is invalid
+              return;
             }
             setMetadata({
               email,
@@ -387,17 +512,48 @@ function EmailSelector({
   );
 }
 
-function AISelector({ setMetadata }: { setMetadata: (params: any) => void }) {
+function AISelector({
+  setMetadata,
+  currentActionPosition,
+}: {
+  setMetadata: (params: any) => void;
+  currentActionPosition: number;
+}) {
   const [prompt, setPrompt] = useState("");
+  const [showTokens, setShowTokens] = useState(false);
+
+  const insertToken = (token: string) => {
+    setPrompt((prev) => `${prev}${prev ? " " : ""}${token}`);
+  };
 
   return (
     <div>
-      <Input
-        label={"Prompt"}
-        type={"text"}
-        placeholder="e.g. Summarize this commit message: {head_commit.message}"
-        onChange={(e) => setPrompt(e.target.value)}
-      ></Input>
+      <div className="text-sm pb-1 pt-2">
+        * <label>Prompt</label>
+      </div>
+      <div className="flex gap-2">
+        <textarea
+          className="border rounded px-4 py-2 w-full border-black min-h-[90px]"
+          value={prompt}
+          placeholder="e.g. Summarize this commit message: {trigger.pull_request.title}"
+          onChange={(e) => setPrompt(e.target.value)}
+        />
+      </div>
+      <div className="mt-2 flex justify-end">
+        <button
+          type="button"
+          className="border border-slate-300 rounded px-2 py-2 text-xs text-slate-700 bg-white"
+          onClick={() => setShowTokens((prev) => !prev)}
+        >
+          Add variable
+        </button>
+      </div>
+      {showTokens && (
+        <TemplateTokenMenu
+          currentActionPosition={currentActionPosition}
+          onInsert={insertToken}
+        />
+      )}
       <div className="pt-4">
         <PrimaryButton
           onClick={() => {

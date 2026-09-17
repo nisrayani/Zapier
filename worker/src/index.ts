@@ -6,6 +6,63 @@ import { parse } from "./parser.js";
 import { sendEmail } from "./email.js";
 import { sendSol } from "./solana.js";
 
+function normalizeGitHubContext(rawMetadata: Record<string, any>) {
+  const source = rawMetadata ?? {};
+
+  const repository = source.repository ??
+    source.repo ?? {
+      name: source.name ?? "",
+      full_name: source.full_name ?? "",
+      html_url: source.html_url ?? "",
+    };
+
+  const pullRequest = source.pull_request ??
+    source.pullRequest ?? {
+      number: source.number ?? "",
+      title: source.title ?? "",
+      html_url: source.html_url ?? "",
+      body: source.body ?? "",
+    };
+
+  const sender = source.sender ?? source.user ?? {};
+  const action = source.action ?? "unknown";
+
+  return {
+    raw: source,
+    action,
+    repository,
+    pull_request: pullRequest,
+    sender,
+    repository_name: repository.name ?? "",
+    repository_full_name: repository.full_name ?? "",
+    pull_request_number: pullRequest.number ?? "",
+    pull_request_title: pullRequest.title ?? "",
+    pull_request_url: pullRequest.html_url ?? "",
+    sender_login: sender.login ?? "",
+    sender_name: sender.name ?? sender.login ?? "",
+    ref: source.ref ?? "",
+    pusher: source.pusher ?? {},
+    head_commit: source.head_commit ?? {},
+  };
+}
+
+function buildWorkflowContext(rawMetadata: Record<string, any>) {
+  const stepResults = Array.isArray(rawMetadata.steps) ? rawMetadata.steps : [];
+
+  const normalizedTriggerContext = normalizeGitHubContext(rawMetadata);
+  const lastStepOutput =
+    stepResults.length > 0
+      ? (stepResults[stepResults.length - 1]?.output ?? "")
+      : "";
+
+  return {
+    ...rawMetadata,
+    trigger: normalizedTriggerContext,
+    steps: stepResults,
+    ai_output: rawMetadata.ai_output ?? lastStepOutput,
+  };
+}
+
 const prisma = new PrismaClient();
 const kafka = new Kafka({
   clientId: "my-app",
@@ -51,7 +108,7 @@ async function requeueFailedMessage(
 async function main() {
   const consumer = kafka.consumer({ groupId: "main-worker-2" });
   await consumer.connect();
-  await consumer.subscribe({ topic: KAFKA_TOPIC, fromBeginning: true });
+  await consumer.subscribe({ topic: KAFKA_TOPIC, fromBeginning: false });
   console.log(
     `Connected to Kafka broker from worker and ready to consume from topic ${KAFKA_TOPIC}`,
   );
@@ -139,25 +196,25 @@ async function main() {
             ? (rawMetadata as Record<string, any>)
             : {};
 
+        const stepResults: Record<string, any>[] = Array.isArray(
+          zapRunDetailsMetaData.steps,
+        )
+          ? zapRunDetailsMetaData.steps
+          : [];
+
+        const workflowContext = buildWorkflowContext(zapRunDetailsMetaData);
+
         switch (currentAction.type.name) {
-          case "email":
+          case "email": {
             console.log("Processing Email action");
             const emailTemplateContext = {
-              ...zapRunDetailsMetaData,
-              ai_output: zapRunDetailsMetaData.ai_output ?? "",
+              ...workflowContext,
+              ai_output: workflowContext.ai_output ?? "",
             };
 
             const configuredBody =
               ((currentAction.metadata as JsonObject).body as string) ?? "";
-            const body =
-              configuredBody.includes("{ai_output}") ||
-              configuredBody.includes("{ai_output}")
-                ? parse(configuredBody, emailTemplateContext)
-                : `${configuredBody}${
-                    configuredBody && emailTemplateContext.ai_output
-                      ? "\n\n"
-                      : ""
-                  }${emailTemplateContext.ai_output}`;
+            const body = parse(configuredBody, emailTemplateContext);
             const to = parse(
               (currentAction.metadata as JsonObject).email as string,
               emailTemplateContext,
@@ -168,10 +225,30 @@ async function main() {
               emailTemplateContext,
             );
 
+            const emailResult = {
+              actionType: "email",
+              sortingOrder: stage,
+              output: body,
+            };
+
+            const nextStepResults = [...stepResults, emailResult];
+            await prisma.zapRun.update({
+              where: { id: zapRunId },
+              data: {
+                metadata: {
+                  ...zapRunDetailsMetaData,
+                  trigger: workflowContext.trigger,
+                  steps: nextStepResults,
+                  ai_output: workflowContext.ai_output ?? "",
+                },
+              },
+            });
+
             await sendEmail(to, subject, body);
             break;
+          }
           case "openai":
-          case "ai_summary":
+          case "ai_summary": {
             console.log("Processing AI action with Gemini");
             if (!ai) {
               throw new Error("GEMINI_API_KEY is not configured.");
@@ -179,7 +256,7 @@ async function main() {
 
             const promptTemplate = parse(
               (currentAction.metadata as JsonObject).prompt as string,
-              zapRunDetailsMetaData,
+              workflowContext,
             );
 
             const response = await ai.models.generateContent({
@@ -190,27 +267,43 @@ async function main() {
             const aiResult = response.text ?? "";
             console.log(`Gemini AI Output: ${aiResult}`);
 
-            zapRunDetailsMetaData.ai_output = aiResult;
+            const nextStepResults = [
+              ...stepResults,
+              {
+                actionType: currentAction.type.name,
+                sortingOrder: stage,
+                output: aiResult,
+              },
+            ];
+
+            const updatedWorkflowMetadata = {
+              ...zapRunDetailsMetaData,
+              trigger: workflowContext.trigger,
+              steps: nextStepResults,
+              ai_output: aiResult,
+            };
 
             await prisma.zapRun.update({
               where: { id: zapRunId },
               data: {
-                metadata: zapRunDetailsMetaData,
+                metadata: updatedWorkflowMetadata,
               },
             });
             break;
-          case "solana_send":
+          }
+          case "solana_send": {
             console.log("Processing Solana send");
             const amount = parse(
               (currentAction.metadata as JsonObject).amount as string,
-              zapRunDetailsMetaData,
+              workflowContext,
             );
             const address = parse(
               (currentAction.metadata as JsonObject).address as string,
-              zapRunDetailsMetaData,
+              workflowContext,
             );
             await sendSol(amount, address);
             break;
+          }
           default:
         }
 
