@@ -62,7 +62,6 @@ model ZapRun{
     status    Status   @default(PENDING)
     metadata  Json?
     createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
     zapOutbox ZapOutbox[]
 }
 

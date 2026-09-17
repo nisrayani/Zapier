@@ -24,6 +24,8 @@ async function main() {
       take: 10,
     });
 
+    const zapRunIds = pendingZaps.map((zap) => zap.zapRunId);
+
     await producer.send({
       topic: KAFKA_TOPIC,
       messages: pendingZaps.map((zap) => ({
@@ -33,12 +35,15 @@ async function main() {
       })),
     });
 
-    await prisma.zapOutbox.deleteMany({
-      where: {
-        zapRunId: {
-          in: pendingZaps.map((zap) => zap.zapRunId),
-        },
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.zapRun.updateMany({
+        where: { id: { in: zapRunIds } },
+        data: { status: Status.PUBLISHED },
+      });
+
+      await tx.zapOutbox.deleteMany({
+        where: { zapRunId: { in: zapRunIds } },
+      });
     });
   }
 }

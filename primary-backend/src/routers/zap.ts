@@ -69,6 +69,21 @@ router.get("/", authMiddleware, async (req, res) => {
   res.json(zaps);
 });
 
+router.get("/zapRuns/:zapId", authMiddleware, async (req, res) => {
+  const zapId = req.params.zapId;
+  const zapRuns = await prisma.zapRun.findMany({
+    where: {
+      zapId: zapId as string,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+  res.json({
+    zapRuns,
+  });
+});
+
 router.get("/:zapId", authMiddleware, async (req, res) => {
   // @ts-ignore
   const userId = req.userId as string;
@@ -95,21 +110,6 @@ router.get("/:zapId", authMiddleware, async (req, res) => {
     return res.status(404).json({ message: "Zap not found" });
   }
   res.json(zap);
-});
-
-router.get("/zapRuns/:zapId", authMiddleware, async (req, res) => {
-  const zapId = req.params.zapId;
-  const zapRuns = await prisma.zapRun.findMany({
-    where: {
-      zapId: zapId as string,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
-  res.json({
-    zapRuns,
-  });
 });
 
 export const zapRouter = router;
