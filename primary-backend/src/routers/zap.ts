@@ -97,4 +97,16 @@ router.get("/:zapId", authMiddleware, async (req, res) => {
   res.json(zap);
 });
 
+router.get("/zapRuns/:zapId", authMiddleware, async (req, res) => {
+  const zapId = req.params.zapId;
+  const zapRuns = await prisma.zapRun.findMany({
+    where: {
+      zapId: zapId as string,
+    },
+  });
+  res.json({
+    zapRuns,
+  });
+});
+
 export const zapRouter = router;
