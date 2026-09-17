@@ -17,9 +17,11 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
+    "@google/genai": "^2.23.0",
     "@prisma/client": "^6.19.3",
     "ka": "^0.0.1",
     "kafkajs": "^2.2.4",
-    "nodemailer": "^10.0.10"
+    "nodemailer": "^10.0.10",
+    "openai": "^4.104.0"
   }
 }

@@ -252,6 +252,28 @@ function Modal({
               />
             )}
 
+            {step === 1 && selectedAction?.name === "ai_summary" && (
+              <AISelector
+                setMetadata={(metadata) => {
+                  onSelect({
+                    ...selectedAction,
+                    metadata,
+                  });
+                }}
+              />
+            )}
+
+            {step === 1 && selectedAction?.name === "openai" && (
+              <AISelector
+                setMetadata={(metadata) => {
+                  onSelect({
+                    ...selectedAction,
+                    metadata,
+                  });
+                }}
+              />
+            )}
+
             {step === 1 && selectedAction?.name === "solana_send" && (
               <SolanaSelector
                 setMetadata={(metadata) => {
@@ -355,6 +377,32 @@ function EmailSelector({
               email,
               subject,
               body,
+            });
+          }}
+        >
+          Submit
+        </PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+function AISelector({ setMetadata }: { setMetadata: (params: any) => void }) {
+  const [prompt, setPrompt] = useState("");
+
+  return (
+    <div>
+      <Input
+        label={"Prompt"}
+        type={"text"}
+        placeholder="e.g. Summarize this commit message: {head_commit.message}"
+        onChange={(e) => setPrompt(e.target.value)}
+      ></Input>
+      <div className="pt-4">
+        <PrimaryButton
+          onClick={() => {
+            setMetadata({
+              prompt,
             });
           }}
         >

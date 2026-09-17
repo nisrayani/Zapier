@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import type { JsonObject } from "@prisma/client/runtime/library";
 import { Kafka } from "kafkajs";
+import { GoogleGenAI } from "@google/genai";
 import { parse } from "./parser.js";
 import { sendEmail } from "./email.js";
 import { sendSol } from "./solana.js";
@@ -10,7 +11,42 @@ const kafka = new Kafka({
   clientId: "my-app",
   brokers: ["localhost:9092"],
 });
+const geminiApiKey = process.env.GEMINI_API_KEY;
+
+if (!geminiApiKey) {
+  console.warn(
+    "GEMINI_API_KEY is not configured. AI actions will fail until it is set.",
+  );
+}
+
+const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
 const KAFKA_TOPIC = "zap-events";
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 5000;
+
+async function requeueFailedMessage(
+  producer: ReturnType<typeof kafka.producer>,
+  topic: string,
+  payload: Record<string, any>,
+  nextAttempt: number,
+  error: unknown,
+) {
+  const retryPayload = {
+    ...payload,
+    attempt: nextAttempt,
+    lastError: error instanceof Error ? error.message : String(error),
+    retryAt: Date.now() + RETRY_DELAY_MS,
+  };
+
+  await producer.send({
+    topic,
+    messages: [{ value: JSON.stringify(retryPayload) }],
+  });
+
+  console.warn(
+    `Retry scheduled for zapRunId=${payload.zapRunId}, stage=${payload.stage}, attempt=${nextAttempt}/${MAX_RETRIES} in ${RETRY_DELAY_MS}ms`,
+  );
+}
 
 async function main() {
   const consumer = kafka.consumer({ groupId: "main-worker-2" });
@@ -48,6 +84,7 @@ async function main() {
       const parsedValue = JSON.parse(message.value?.toString());
       const zapRunId = parsedValue.zapRunId;
       const stage = parsedValue.stage;
+      const attempt = Number(parsedValue.attempt ?? 0);
 
       const zapRunDetails = await prisma.zapRun.findFirst({
         where: {
@@ -94,36 +131,83 @@ async function main() {
       }
 
       try {
-        const zapRunDetailsMetaData = zapRunDetails?.metadata;
+        const rawMetadata = zapRunDetails?.metadata;
+        const zapRunDetailsMetaData: Record<string, any> =
+          rawMetadata &&
+          typeof rawMetadata === "object" &&
+          !Array.isArray(rawMetadata)
+            ? (rawMetadata as Record<string, any>)
+            : {};
 
         switch (currentAction.type.name) {
           case "email":
             console.log("Processing Email action");
-            const body = parse(
-              (currentAction.metadata as JsonObject).body as string,
-              zapRunDetailsMetaData as Record<string, any>,
-            );
+            const emailTemplateContext = {
+              ...zapRunDetailsMetaData,
+              ai_output: zapRunDetailsMetaData.ai_output ?? "",
+            };
+
+            const configuredBody =
+              ((currentAction.metadata as JsonObject).body as string) ?? "";
+            const body =
+              configuredBody.includes("{ai_output}") ||
+              configuredBody.includes("{ai_output}")
+                ? parse(configuredBody, emailTemplateContext)
+                : `${configuredBody}${
+                    configuredBody && emailTemplateContext.ai_output
+                      ? "\n\n"
+                      : ""
+                  }${emailTemplateContext.ai_output}`;
             const to = parse(
               (currentAction.metadata as JsonObject).email as string,
-              zapRunDetailsMetaData as Record<string, any>,
+              emailTemplateContext,
             );
             const subject = parse(
               ((currentAction.metadata as JsonObject).subject as string) ??
                 "Hello from Zapier",
-              zapRunDetailsMetaData as Record<string, any>,
+              emailTemplateContext,
             );
 
             await sendEmail(to, subject, body);
+            break;
+          case "openai":
+          case "ai_summary":
+            console.log("Processing AI action with Gemini");
+            if (!ai) {
+              throw new Error("GEMINI_API_KEY is not configured.");
+            }
+
+            const promptTemplate = parse(
+              (currentAction.metadata as JsonObject).prompt as string,
+              zapRunDetailsMetaData,
+            );
+
+            const response = await ai.models.generateContent({
+              model: "gemini-3.6-flash",
+              contents: promptTemplate,
+            });
+
+            const aiResult = response.text ?? "";
+            console.log(`Gemini AI Output: ${aiResult}`);
+
+            zapRunDetailsMetaData.ai_output = aiResult;
+
+            await prisma.zapRun.update({
+              where: { id: zapRunId },
+              data: {
+                metadata: zapRunDetailsMetaData,
+              },
+            });
             break;
           case "solana_send":
             console.log("Processing Solana send");
             const amount = parse(
               (currentAction.metadata as JsonObject).amount as string,
-              zapRunDetailsMetaData as Record<string, any>,
+              zapRunDetailsMetaData,
             );
             const address = parse(
               (currentAction.metadata as JsonObject).address as string,
-              zapRunDetailsMetaData as Record<string, any>,
+              zapRunDetailsMetaData,
             );
             await sendSol(amount, address);
             break;
@@ -181,6 +265,32 @@ async function main() {
         ]);
       } catch (error) {
         console.error(`Error at stage ${stage} for run ${zapRunId}:`, error);
+
+        const nextAttempt = attempt + 1;
+
+        if (nextAttempt <= MAX_RETRIES) {
+          await requeueFailedMessage(
+            producer,
+            KAFKA_TOPIC,
+            {
+              ...parsedValue,
+              zapRunId,
+              stage,
+            },
+            nextAttempt,
+            error,
+          );
+
+          await consumer.commitOffsets([
+            {
+              topic: KAFKA_TOPIC,
+              partition: partition,
+              offset: (Number(message.offset) + 1).toString(),
+            },
+          ]);
+          return;
+        }
+
         await prisma.zapRun
           .update({
             where: { id: zapRunId },
@@ -189,6 +299,14 @@ async function main() {
             },
           })
           .catch(() => undefined);
+
+        await consumer.commitOffsets([
+          {
+            topic: KAFKA_TOPIC,
+            partition: partition,
+            offset: (Number(message.offset) + 1).toString(),
+          },
+        ]);
       }
     },
   });
